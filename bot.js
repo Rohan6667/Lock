@@ -3,43 +3,53 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 
 async function start() {
-    const browser = await puppeteer.launch({
-        headless: "new",
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    const browser = await puppeteer.launch({ 
+        headless: "new", 
+        args: ['--no-sandbox', '--disable-blink-features=AutomationControlled'] 
     });
     const page = await browser.newPage();
     
+    // 1. Human-like User Agent & Headers
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36');
+
     try {
-        await page.goto(process.env.TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-        console.log("Page 1: Navigating...");
-
-        // 1. Verify/Continue Button
-        const vBtn = "//a[contains(text(), 'Verify')] | //button[contains(text(), 'Verify')]";
-        await page.waitForXPath(vBtn, { visible: true, timeout: 20000 }).catch(() => console.log("Skip step 1"));
-        const [btn1] = await page.$x(vBtn);
-        if (btn1) await btn1.click();
+        await page.goto(process.env.TARGET_URL, { waitUntil: 'networkidle2' });
         
-        console.log("Waiting for timer (15s)...");
-        await new Promise(r => setTimeout(r, 15000));
+        // 2. Random Delay to mimic human thinking
+        const randomDelay = (min, max) => new Promise(r => setTimeout(r, Math.floor(Math.random() * (max - min + 1) + min)));
 
-        // 2. Universal "Get Link" Finder (ID pe depend nahi karega)
-        console.log("Searching for 'Get Link' button...");
-        await page.waitForFunction(() => {
-            const elements = Array.from(document.querySelectorAll('a, button'));
-            const target = elements.find(el => el.innerText.toLowerCase().includes('get link') || el.innerText.toLowerCase().includes('open link'));
-            if (target) {
+        // Step 1: Click Verify
+        await randomDelay(2000, 5000); 
+        await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('a, button'));
+            const vBtn = btns.find(b => b.innerText.toLowerCase().includes('verify'));
+            if(vBtn) vBtn.click();
+        });
+
+        // Step 2: Adaptive Timer Wait
+        console.log("Waiting for timer...");
+        await randomDelay(10000, 13000); 
+
+        // Step 3: Evade detection by simulating Mouse Movement
+        await page.mouse.move(100, 100);
+        await randomDelay(500, 1500);
+        await page.mouse.move(500, 500);
+
+        // Step 4: Final Click with "Human Jitter"
+        await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('a, button'));
+            const target = btns.find(b => b.innerText.toLowerCase().includes('get link') || b.innerText.toLowerCase().includes('open'));
+            if(target) {
+                target.style.pointerEvents = 'auto'; // Force interaction
                 target.click();
-                return true;
             }
-            return false;
-        }, { timeout: 20000 });
+        });
 
-        console.log("Success! Final button clicked.");
-        await new Promise(r => setTimeout(r, 5000));
-        console.log("Final URL: " + page.url());
+        await randomDelay(3000, 6000);
+        console.log("Final URL reached: " + page.url());
 
     } catch (e) {
-        console.error("Critical Error: " + e.message);
+        console.error("Detection Triggered: " + e.message);
     } finally {
         await browser.close();
     }
