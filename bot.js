@@ -1,54 +1,47 @@
-const puppeteer = require('puppeteer-extra');
+hereconst puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 
 async function start() {
-    console.log("--- BOT STARTING ---");
     const browser = await puppeteer.launch({
         headless: "new",
         args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
-    
     const page = await browser.newPage();
     
     try {
-        console.log("Navigating to target URL...");
         await page.goto(process.env.TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-        console.log("Initial page loaded successfully.");
+        console.log("Page 1: Navigating...");
 
-        // Step 1: Verify/Continue
-        const verifyXpath = "//a[contains(text(), 'Verify')] | //button[contains(text(), 'Verify')] | //div[contains(text(), 'Continue')]";
-        console.log("Waiting for Verify/Continue button...");
-        await page.waitForXPath(verifyXpath, { visible: true, timeout: 30000 });
-        const [btn1] = await page.$x(verifyXpath);
-        await btn1.click();
-        console.log("Step 1 Complete: Verify/Continue button clicked.");
-
-        // Step 2: Timer Wait
-        console.log("Timer active: Waiting 10 seconds for shortener process...");
-        await new Promise(r => setTimeout(r, 10000));
-        console.log("Timer finished.");
-
-        // Step 3: Final Link
-        const finalBtn = '#btn-main'; 
-        console.log("Looking for final 'Get Link' button...");
-        await page.waitForSelector(finalBtn, { visible: true, timeout: 20000 });
+        // 1. Verify/Continue Button
+        const vBtn = "//a[contains(text(), 'Verify')] | //button[contains(text(), 'Verify')]";
+        await page.waitForXPath(vBtn, { visible: true, timeout: 20000 }).catch(() => console.log("Skip step 1"));
+        const [btn1] = await page.$x(vBtn);
+        if (btn1) await btn1.click();
         
-        console.log("Clicking final button now...");
-        await Promise.all([
-            page.click(finalBtn),
-            page.waitForNavigation({ waitUntil: 'networkidle0' }).catch(() => {})
-        ]);
+        console.log("Waiting for timer (15s)...");
+        await new Promise(r => setTimeout(r, 15000));
 
-        console.log("SUCCESS: Final destination reached. Current URL: " + page.url());
+        // 2. Universal "Get Link" Finder (ID pe depend nahi karega)
+        console.log("Searching for 'Get Link' button...");
+        await page.waitForFunction(() => {
+            const elements = Array.from(document.querySelectorAll('a, button'));
+            const target = elements.find(el => el.innerText.toLowerCase().includes('get link') || el.innerText.toLowerCase().includes('open link'));
+            if (target) {
+                target.click();
+                return true;
+            }
+            return false;
+        }, { timeout: 20000 });
+
+        console.log("Success! Final button clicked.");
+        await new Promise(r => setTimeout(r, 5000));
+        console.log("Final URL: " + page.url());
 
     } catch (e) {
-        console.error("--- BOT ERROR DETECTED ---");
-        console.error("Error Message: " + e.message);
-        console.error("Current URL at crash: " + page.url());
+        console.error("Critical Error: " + e.message);
     } finally {
         await browser.close();
-        console.log("--- BROWSER CLOSED ---");
     }
 }
 start();
