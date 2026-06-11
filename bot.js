@@ -1,55 +1,50 @@
-hereconst puppeteer = require('puppeteer-extra');
+const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 
 async function start() {
     const browser = await puppeteer.launch({ 
         headless: "new", 
-        args: ['--no-sandbox', '--disable-blink-features=AutomationControlled'] 
+        args: ['--no-sandbox', '--disable-setuid-sandbox'] 
     });
     const page = await browser.newPage();
     
-    // 1. Human-like User Agent & Headers
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36');
+    // Stealth Headers - Site ko lagega ki ye real Chrome browser hai
+    await page.setExtraHTTPHeaders({
+        'Accept-Language': 'en-US,en;q=0.9'
+    });
 
     try {
-        await page.goto(process.env.TARGET_URL, { waitUntil: 'networkidle2' });
-        
-        // 2. Random Delay to mimic human thinking
-        const randomDelay = (min, max) => new Promise(r => setTimeout(r, Math.floor(Math.random() * (max - min + 1) + min)));
+        console.log("Navigating to: " + process.env.TARGET_URL);
+        await page.goto(process.env.TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
 
-        // Step 1: Click Verify
-        await randomDelay(2000, 5000); 
+        // 1. First Click: Isko delay ke saath handle karo
+        await new Promise(r => setTimeout(r, 3000));
         await page.evaluate(() => {
-            const btns = Array.from(document.querySelectorAll('a, button'));
-            const vBtn = btns.find(b => b.innerText.toLowerCase().includes('verify'));
-            if(vBtn) vBtn.click();
+            const btn = document.querySelector('.btn-primary') || document.querySelector('button');
+            if(btn) btn.click();
         });
 
-        // Step 2: Adaptive Timer Wait
+        // 2. Timer Handling: 8 seconds + 2 seconds buffer
         console.log("Waiting for timer...");
-        await randomDelay(10000, 13000); 
+        await new Promise(r => setTimeout(r, 10000));
 
-        // Step 3: Evade detection by simulating Mouse Movement
-        await page.mouse.move(100, 100);
-        await randomDelay(500, 1500);
-        await page.mouse.move(500, 500);
-
-        // Step 4: Final Click with "Human Jitter"
+        // 3. Final Step: Button ko locate karke force click
+        console.log("Locating final button...");
         await page.evaluate(() => {
-            const btns = Array.from(document.querySelectorAll('a, button'));
-            const target = btns.find(b => b.innerText.toLowerCase().includes('get link') || b.innerText.toLowerCase().includes('open'));
-            if(target) {
-                target.style.pointerEvents = 'auto'; // Force interaction
-                target.click();
+            // Shortener sites aksar button ko 'disabled' rakhti hain, hum use 'enabled' karenge
+            const btn = document.querySelector('#btn-main') || document.querySelector('.get-link');
+            if(btn) {
+                btn.removeAttribute('disabled');
+                btn.click();
             }
         });
 
-        await randomDelay(3000, 6000);
-        console.log("Final URL reached: " + page.url());
+        await new Promise(r => setTimeout(r, 5000));
+        console.log("Redirected URL: " + page.url());
 
     } catch (e) {
-        console.error("Detection Triggered: " + e.message);
+        console.error("Bot Blocked / Error: " + e.message);
     } finally {
         await browser.close();
     }
