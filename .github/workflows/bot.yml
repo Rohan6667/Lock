@@ -17,7 +17,5 @@ jobs:
       - name: Run Bot
         env:
           TARGET_URL: ${{ secrets.TARGET_URL }}
-        run: |
-          # Ye command file ko sahi jagah se dhundh kar run karegi
-          find . -name "bot.js" -exec node {} \;
+        run: node bot.js
 
