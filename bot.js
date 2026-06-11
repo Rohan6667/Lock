@@ -3,50 +3,54 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 puppeteer.use(StealthPlugin());
 
 async function start() {
+    console.log("[START] Browser launching...");
     const browser = await puppeteer.launch({ 
         headless: "new", 
         args: ['--no-sandbox', '--disable-setuid-sandbox'] 
     });
     const page = await browser.newPage();
     
-    // Stealth Headers - Site ko lagega ki ye real Chrome browser hai
-    await page.setExtraHTTPHeaders({
-        'Accept-Language': 'en-US,en;q=0.9'
-    });
-
     try {
-        console.log("Navigating to: " + process.env.TARGET_URL);
+        console.log(`[URL] Navigating to: ${process.env.TARGET_URL}`);
         await page.goto(process.env.TARGET_URL, { waitUntil: 'networkidle2', timeout: 60000 });
+        console.log("[SUCCESS] Page loaded.");
 
-        // 1. First Click: Isko delay ke saath handle karo
-        await new Promise(r => setTimeout(r, 3000));
-        await page.evaluate(() => {
-            const btn = document.querySelector('.btn-primary') || document.querySelector('button');
-            if(btn) btn.click();
-        });
+        // Step 1: Verify Button
+        console.log("[STEP 1] Looking for 'Verify' button...");
+        await page.waitForXPath("//a[contains(text(), 'Verify')] | //button[contains(text(), 'Verify')]", { timeout: 15000 });
+        const [vBtn] = await page.$x("//a[contains(text(), 'Verify')] | //button[contains(text(), 'Verify')]");
+        if (vBtn) {
+            await vBtn.click();
+            console.log("[STEP 1] Verify clicked. Redirecting...");
+            await page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {});
+        }
 
-        // 2. Timer Handling: 8 seconds + 2 seconds buffer
-        console.log("Waiting for timer...");
-        await new Promise(r => setTimeout(r, 10000));
+        // Step 2: Timer
+        console.log("[STEP 2] Timer started (12 seconds)...");
+        await new Promise(r => setTimeout(r, 12000));
+        console.log("[STEP 2] Timer elapsed.");
 
-        // 3. Final Step: Button ko locate karke force click
-        console.log("Locating final button...");
-        await page.evaluate(() => {
-            // Shortener sites aksar button ko 'disabled' rakhti hain, hum use 'enabled' karenge
+        // Step 3: Final Button (The Bridge)
+        console.log("[STEP 3] Final bridge: Executing force-click...");
+        const result = await page.evaluate(() => {
             const btn = document.querySelector('#btn-main') || document.querySelector('.get-link');
-            if(btn) {
+            if (btn) {
                 btn.removeAttribute('disabled');
                 btn.click();
+                return "CLICKED_SUCCESSFULLY";
             }
+            return "BUTTON_NOT_FOUND";
         });
 
-        await new Promise(r => setTimeout(r, 5000));
-        console.log("Redirected URL: " + page.url());
+        console.log(`[RESULT] ${result}`);
+        await new Promise(r => setTimeout(r, 3000));
+        console.log(`[END] Final URL: ${page.url()}`);
 
     } catch (e) {
-        console.error("Bot Blocked / Error: " + e.message);
+        console.error(`[CRITICAL ERROR] ${e.message}`);
     } finally {
         await browser.close();
+        console.log("[FINISH] Browser closed.");
     }
 }
 start();
