@@ -4,25 +4,27 @@ const axios = require('axios');
 
 puppeteer.use(StealthPlugin());
 
-async function runBot() {
-    console.log("Bot Start Ho Gaya...");
+async function run() {
+    console.log("Bot started...");
     const browser = await puppeteer.launch({
         headless: "new",
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
     });
 
     const page = await browser.newPage();
     try {
-        const url = process.env.TARGET_URL;
-        await page.goto(url, { waitUntil: 'networkidle2' });
-        console.log("Page Load Ho Gaya!");
-        // Yahan tumhara click logic aayega
-        await new Promise(r => setTimeout(r, 5000));
-    } catch (err) {
-        console.log("Error:", err.message);
+        const target = process.env.TARGET_URL;
+        if (!target) throw new Error("TARGET_URL not set in Secrets!");
+        
+        console.log("Navigating...");
+        await page.goto(target, { waitUntil: 'networkidle2', timeout: 60000 });
+        await new Promise(r => setTimeout(r, 10000));
+        
+        console.log("Process complete.");
+    } catch (e) {
+        console.error("Error:", e.message);
     } finally {
         await browser.close();
     }
 }
-
-runBot();
+run();
