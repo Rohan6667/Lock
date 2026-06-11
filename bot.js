@@ -1,53 +1,47 @@
-const puppeteer = require('puppeteer-extra');
+hereconst puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const axios = require('axios');
 
 puppeteer.use(StealthPlugin());
 
-async function getProxy() {
-    try {
-        const res = await axios.get('https://proxylist.geonode.com/api/proxy-list?limit=1&page=1&sort_by=lastChecked&sort_type=desc', { timeout: 5000 });
-        const p = res.data.data[0];
-        return `${p.protocols[0]}://${p.ip}:${p.port}`;
-    } catch (e) { return null; }
-}
-
 async function start() {
-    const proxy = await getProxy();
     const browser = await puppeteer.launch({
         headless: "new",
-        args: [proxy ? `--proxy-server=${proxy}` : '--no-sandbox', '--no-sandbox', '--disable-setuid-sandbox']
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
     const page = await browser.newPage();
-    await page.goto(process.env.TARGET_URL, { waitUntil: 'networkidle2' });
+    // Anti-bot detection ke liye user agent set karo
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36');
 
-    // Multi-page navigation handler
-    for (let i = 0; i < 5; i++) { // Max 5 pages handle karega
-        console.log(`Checking page ${i + 1}...`);
-        await new Promise(r => setTimeout(r, 7000)); // Har page par 7 sec wait
+    try {
+        console.log("Navigating...");
+        await page.goto(process.env.TARGET_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-        const selectors = ['button#submit-button', '.get-link', 'a#btn-main', 'button[type="submit"]', '.btn-primary', '#next-button'];
-        
-        for (const sel of selectors) {
-            if (await page.$(sel)) {
-                console.log(`Clicking ${sel}`);
-                await Promise.all([
-                    page.click(sel),
-                    page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {})
-                ]);
+        // Logic: Buttons ko dhundho aur click karo
+        for (let attempt = 0; attempt < 5; attempt++) {
+            console.log(`Attempt ${attempt + 1}: Checking for buttons...`);
+            
+            // Yahan CSS selectors change kar sakte ho agar button id alag ho
+            const buttons = ['#btn-main', '.get-link', '#get-link', 'a.btn-primary', 'button.get-link'];
+            
+            for (const selector of buttons) {
+                if (await page.$(selector)) {
+                    await page.click(selector);
+                    console.log(`Clicked: ${selector}`);
+                    await new Promise(r => setTimeout(r, 5000)); // 5 sec wait
+                }
+            }
+            
+            // Agar page redirect ho gaya, toh ruk jao
+            if (page.url().includes('google') || page.url().includes('drive')) {
+                console.log("Destination reached!");
                 break;
             }
         }
-        
-        // Final destination check
-        const currentUrl = page.url();
-        if (currentUrl.includes('google.com') || currentUrl.includes('drive.google')) {
-            console.log("Reached destination!");
-            break;
-        }
+    } catch (e) {
+        console.error("Error: " + e.message);
+    } finally {
+        await browser.close();
     }
-    await browser.close();
 }
-
 start();
