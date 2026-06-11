@@ -1,19 +1,21 @@
 name: Click Engine
 on:
   schedule:
-    # Iska matlab hai kabhi 20th minute par, kabhi 50th minute par
-    - cron: '15,45 * * * *' 
+    - cron: '*/30 * * * *'
   workflow_dispatch:
 
 jobs:
-  run:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: Setup Node
         uses: actions/setup-node@v3
-        with: { node-version: '20' }
-      - run: npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth axios
+        with:
+          node-version: '20'
+      - name: Install Dependencies
+        run: |
+          npm install puppeteer puppeteer-extra puppeteer-extra-plugin-stealth axios
       - name: Run Bot
         env:
           TARGET_URL: ${{ secrets.TARGET_URL }}
