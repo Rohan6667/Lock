@@ -1,4 +1,4 @@
-here{
+{
   "dependencies": {
     "puppeteer": "latest",
     "puppeteer-extra": "latest",
